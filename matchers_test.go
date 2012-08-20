@@ -12,18 +12,6 @@ func (mock *MockT) Errorf(format string, args ...interface{}) {
     mock.errArgs = append(mock.errArgs, format)
 }
 
-type Errorable interface {
-    Errorf(string, ...interface{})
-}
-
-type Matcher func(interface{}) (bool, string)
-
-func AssertThat(t Errorable, expected interface{}, m Matcher) {
-    if ok, msg := m(expected); !ok {
-        t.Errorf(msg)
-    }
-}
-
 func TestAssertThatLogsStringWhenMatchFails(t *testing.T) {
     var mockT MockT
     AssertThat(&mockT, true, func(actual interface{}) (bool, string) {
