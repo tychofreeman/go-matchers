@@ -82,3 +82,32 @@ func TestRecognizesConstantMessage(t *testing.T) {
 func TestFailsIfMessageIsNotGiven(t *testing.T) {
     AssertThat(t, Ignored{}, Not(HasMessage("not found", ConstMatcher(false, "this is the real msg"))))
 }
+
+type MockEquals struct {
+    UsedEqualsMethod bool
+    Expected bool
+}
+
+func (e *MockEquals) Equals(other interface{}) bool {
+    e.UsedEqualsMethod = true
+    return e.Expected
+}
+
+func TestUsesEqualsIfExists(t *testing.T) {
+    e := new(MockEquals)
+    Equals(e)(false)
+
+    AssertThat(t, e.UsedEqualsMethod, IsTrue)
+}
+
+func TestUsesEqualSignIfNotEuqalable(t *testing.T) {
+    AssertThat(t, true, Equals(true))
+}
+
+func TestCanCompareArbitraryTypes(t *testing.T) {
+    AssertThat(t, Ignored{}, Equals(Ignored{}))
+}
+
+func TestCatchesDifferencesInArbitraryTypes(t *testing.T) {
+    AssertThat(t, MockEquals{Expected: true}, Not(Equals(MockEquals{})))
+}
