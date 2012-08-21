@@ -47,4 +47,25 @@ func HasMessage(expected string, m Matcher) Matcher {
     }
 }
 
-func 
+type Equalable interface {
+    Equals(interface{}) bool
+}
+
+func EqualsMsg(expected, actual interface{}) string {
+    return fmt.Sprintf("'%v%v' expected, but got '%v%v'", 
+            reflect.TypeOf(expected).Name(), expected,
+            reflect.TypeOf(actual).Name(), actual)
+}
+
+func Equals(expectedI interface{}) Matcher {
+
+    switch expected := expectedI.(type) {
+        case Equalable:
+            return func (actual interface{}) (bool, string) {
+                return expected.Equals(actual), EqualsMsg(expected, actual)
+            }
+    }
+    return func (actual interface{}) (bool, string) {
+        return expectedI == actual, EqualsMsg(expectedI, actual)
+    }
+}
