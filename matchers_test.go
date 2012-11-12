@@ -88,9 +88,9 @@ type MockEquals struct {
     Expected bool
 }
 
-func (e *MockEquals) Equals(other interface{}) bool {
+func (e *MockEquals) Equals(other interface{}) (bool, string) {
     e.UsedEqualsMethod = true
-    return e.Expected
+    return e.Expected, "formatted equals message"
 }
 
 func TestUsesEqualsIfExists(t *testing.T) {
@@ -110,4 +110,48 @@ func TestCanCompareArbitraryTypes(t *testing.T) {
 
 func TestCatchesDifferencesInArbitraryTypes(t *testing.T) {
     AssertThat(t, MockEquals{Expected: true}, Not(Equals(MockEquals{})))
+}
+
+func TestEmptySpliceIsEmpty(t *testing.T) {
+    AssertThat(t, make([]int, 0), IsEmpty)
+}
+
+func TestNonEmptyArrayIsNotEmpty(t *testing.T) {
+    nonEmpty := []bool{ true, false, true }
+    AssertThat(t, nonEmpty, Not(IsEmpty))
+}
+
+func TestEmptyMapIsEmpty(t *testing.T) {
+    empty := make(map[string]string)
+    AssertThat(t, empty, IsEmpty)
+}
+
+func TestNonEmptyMapIsNotEmpty(t *testing.T) {
+    nonEmpty := make(map[string]string)
+    nonEmpty["abc"] = "def"
+    AssertThat(t, nonEmpty, Not(IsEmpty))
+}
+
+type MockIsEmpty bool
+func (m MockIsEmpty) IsEmpty() bool {
+    return bool(m)
+}
+
+func TestIsEmptyIsUsedWhenFound(t *testing.T) {
+    empty := MockIsEmpty(true)
+    AssertThat(t, empty, IsEmpty)
+
+    notEmpty := MockIsEmpty(false)
+    AssertThat(t, notEmpty, Not(IsEmpty))
+}
+
+func TestIsEmptyPanicsForArbitreryTypes(t *testing.T) {
+    defer func() {
+        e := recover()
+        if e == nil {
+            t.Errorf("Expected to panic when given non-emptable type.")
+        }
+    }()
+
+    AssertThat(t, 0, IsEmpty)
 }

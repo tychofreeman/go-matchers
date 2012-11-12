@@ -48,7 +48,7 @@ func HasMessage(expected string, m Matcher) Matcher {
 }
 
 type Equalable interface {
-    Equals(interface{}) bool
+    Equals(interface{}) (bool, string)
 }
 
 func EqualsMsg(expected, actual interface{}) string {
@@ -62,10 +62,24 @@ func Equals(expectedI interface{}) Matcher {
     switch expected := expectedI.(type) {
         case Equalable:
             return func (actual interface{}) (bool, string) {
-                return expected.Equals(actual), EqualsMsg(expected, actual)
+                return expected.Equals(actual)
             }
     }
     return func (actual interface{}) (bool, string) {
         return expectedI == actual, EqualsMsg(expectedI, actual)
     }
+}
+
+type IsEmptyable interface {
+    IsEmpty() bool
+}
+
+func IsEmpty(actualI interface{}) (bool, string) {
+    switch actual := actualI.(type) {
+        case IsEmptyable:
+            return actual.IsEmpty(), fmt.Sprintf("expected empty, found %v", actual)
+    }
+    v := reflect.ValueOf(actualI)
+    l := v.Len()
+    return l == 0, fmt.Sprintf("expected empty, but had %d items", l)
 }
