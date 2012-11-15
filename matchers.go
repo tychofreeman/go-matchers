@@ -66,7 +66,7 @@ func Equals(expectedI interface{}) Matcher {
             }
     }
     return func (actual interface{}) (bool, string) {
-        return expectedI == actual, EqualsMsg(expectedI, actual)
+        return reflect.DeepEqual(expectedI, actual), EqualsMsg(expectedI, actual)
     }
 }
 
@@ -82,4 +82,17 @@ func IsEmpty(actualI interface{}) (bool, string) {
     v := reflect.ValueOf(actualI)
     l := v.Len()
     return l == 0, fmt.Sprintf("expected empty, but had %d items", l)
+}
+
+func Contains(expected interface{}) Matcher {
+    return func(actualI interface{}) (bool, string) {
+        v := reflect.ValueOf(actualI)
+        l := v.Len()
+        for i := 0; i < l; i++ {
+            if eq, _ := Equals(expected)(v.Index(i).Interface()); eq == true {
+                return true, ""
+            }
+        }
+        return false, fmt.Sprintf("Unable to find %v within %v", expected, actualI)
+    }
 }
