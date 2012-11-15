@@ -155,3 +155,15 @@ func TestIsEmptyPanicsForArbitreryTypes(t *testing.T) {
 
     AssertThat(t, 0, IsEmpty)
 }
+
+func TestContainsDoesntMatchEmptyIntegerSlice(t *testing.T) {
+    list := []int{ }
+    AssertThat(t, list, Not(Contains(5)))
+    AssertThat(t, list, Not(Contains(10)))
+}
+
+func TestContainsMatchesIntegersInAList(t *testing.T) {
+    list := []int{ 5, 10 }
+    AssertThat(t, list, Contains(5))
+    AssertThat(t, list, Contains(10))
+}
