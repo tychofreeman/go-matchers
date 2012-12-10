@@ -48,12 +48,12 @@ func isBool(expected bool, actual interface{}) (bool, string) {
 }
 
 // Basic truthiness
-func IsTrue(actual interface{}) (bool, string) {
+var IsTrue Matcher = func (actual interface{}) (bool, string) {
     return isBool(true, actual)
 }
 
 // Basic falsiness
-func IsFalse(actual interface{}) (bool, string) {
+var IsFalse Matcher = func (actual interface{}) (bool, string) {
     return isBool(false, actual)
 }
 
@@ -86,7 +86,7 @@ func Equals(expectedI interface{}) Matcher {
 }
 
 // Matcher for testing emptiness of containers. Supports IsEmptyable{}, arrays, slices, and maps.
-func IsEmpty(actualI interface{}) (bool, string) {
+var IsEmpty Matcher = func (actualI interface{}) (bool, string) {
     switch actual := actualI.(type) {
         case IsEmptyable:
             return actual.IsEmpty(), fmt.Sprintf("expected empty, found %v", actual)
@@ -108,5 +108,15 @@ func Contains(expected interface{}) Matcher {
             }
         }
         return false, fmt.Sprintf("Unable to find %v within %v", expected, actualI)
+    }
+}
+
+func (m Matcher) And(other Matcher) Matcher {
+    return func(actual interface{}) (bool,string) {
+        passed, msg1 := m(actual)
+        if !passed {
+            return passed, msg1
+        }
+        return other(actual)
     }
 }

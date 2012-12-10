@@ -167,3 +167,7 @@ func TestContainsMatchesIntegersInAList(t *testing.T) {
     AssertThat(t, list, Contains(5))
     AssertThat(t, list, Contains(10))
 }
+
+func TestAndMatchesBothPredicates(t *testing.T) {
+    AssertThat(t, "", IsEmpty.And(Equals("")))
+}
