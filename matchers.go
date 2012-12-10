@@ -1,4 +1,7 @@
-// Implementation of Hamcrest-like matchers for use in Go tests
+// Package matchers is an implementation of Hamcrest-like matchers for use in Go tests.
+// You can use it to simplify your Go tests.
+// Currently, only only Errorf() is supported, so if your tests require a short-circuiting assertion,
+// please fix your tests. Or, you know, submit a pull request.
 package matchers
 
 import (

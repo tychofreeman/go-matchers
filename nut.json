@@ -1,0 +1,13 @@
+{
+  "Version": "0.0.1",
+  "Authors": [
+    {
+      "FullName": "Chris Freeman",
+      "Email": "cwfreeman@gmail.com"
+    }
+  ],
+  "ExtraFiles": [
+    "README.md",
+    "License"
+  ]
+}
