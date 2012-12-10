@@ -6,12 +6,23 @@ import (
     "reflect"
 )
 
-// Uses Errorf() from testing.T, so feel free to replace it with your own
+// Uses Errorf() from testing.T, so feel free to replace it with your own.
 type Errorable interface {
     Errorf(string, ...interface{})
 }
 
+// Interface which supports the Equals() method.
+type Equalable interface {
+    Equals(interface{}) (bool, string)
+}
+
+// Short-hand type for function which is used constantly.
 type Matcher func(interface{}) (bool, string)
+
+// Define this for your type if you want to assert emptyness.
+type IsEmptyable interface {
+    IsEmpty() bool
+}
 
 // The base of this package. Other Assert* functions could be added
 // in the future, likely wrappers for this one.
@@ -21,7 +32,7 @@ func AssertThat(t Errorable, expected interface{}, m Matcher) {
     }
 }
 
-// Invert the behavior of a matcher
+// Invert the behavior of a matcher.
 func Not(m Matcher) Matcher {
     return func(actual interface{}) (bool, string) {
         ok, msg := m(actual)
@@ -55,11 +66,6 @@ func HasMessage(expected string, m Matcher) Matcher {
     }
 }
 
-// Interface which supports the Equals() method.
-type Equalable interface {
-    Equals(interface{}) (bool, string)
-}
-
 func equalsMsg(expected, actual interface{}) string {
     return fmt.Sprintf("'%v%v' expected, but got '%v%v'", 
             reflect.TypeOf(expected).Name(), expected,
@@ -80,11 +86,7 @@ func Equals(expectedI interface{}) Matcher {
     }
 }
 
-type IsEmptyable interface {
-    IsEmpty() bool
-}
-
-// Matcher for testing emptiness of containers
+// Matcher for testing emptiness of containers. Supports IsEmptyable{}, arrays, slices, and maps.
 func IsEmpty(actualI interface{}) (bool, string) {
     switch actual := actualI.(type) {
         case IsEmptyable:
