@@ -135,6 +135,15 @@ func (m Matcher) And(other Matcher) Matcher {
     }
 }
 
+func (m Matcher) Or(other Matcher) Matcher {
+    return func(actual interface{}) (bool,string) {
+        if passed, msg1 := m(actual); passed {
+            return passed, msg1
+        }
+        return other(actual)
+    }
+}
+
 func HasExactly(items ...interface{}) Matcher {
     return func(actual interface{}) (bool,string) {
         if reflect.TypeOf(actual).Kind() == reflect.Slice {
@@ -143,7 +152,7 @@ func HasExactly(items ...interface{}) Matcher {
             lenOfItems := len(items)
             hasSameLen := (lenOfItems == lenOfActual)
             if !hasSameLen {
-                return false, ""
+                return false, fmt.Sprintf("expected collection of size %d, but got size %d", lenOfItems, lenOfActual)
             }
             for i := 0; i < lenOfActual; i++ {
                 switch t := items[i].(type) {
@@ -156,8 +165,8 @@ func HasExactly(items ...interface{}) Matcher {
                         return result, msg
                     }
                 default:
-                    if items[i] != valueOfActual.Index(i) {
-                        return false, ""
+                    if items[i] != valueOfActual.Index(i).Interface() {
+                        return false, fmt.Sprintf("discrepancy at index %d - %s", i, equalsMsg(items, actual))
                     }
                 }
             }
@@ -165,4 +174,8 @@ func HasExactly(items ...interface{}) Matcher {
         }
         return false, fmt.Sprintf("HasExactly() matcher requires a collection, found %T", actual)
     }
+}
+
+func Rtns(returnValues ...interface{}) []interface{} {
+    return returnValues
 }

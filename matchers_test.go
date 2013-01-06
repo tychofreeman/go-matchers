@@ -226,3 +226,8 @@ var testMatcher Matcher = func(actual interface{}) (bool,string) {
 func TestMatchersCanBeUsedInHasExactly(t *testing.T) {
     AssertThat(t, []interface{}{1}, HasExactly(testMatcher))
 }
+
+func TestCanPassVariadicFunctions(t *testing.T) {
+    var f = func() (string,bool) { return "", false }
+    AssertThat(t, Rtns(f()), HasExactly("", false))
+}
