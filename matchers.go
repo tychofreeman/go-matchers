@@ -66,10 +66,24 @@ func HasMessage(expected string, m Matcher) Matcher {
 }
 
 func equalsMsg(expected, actual interface{}) string {
+    var expectedType, actualType string
+    if expected != nil {
+        expectedType = reflect.TypeOf(expected).Name()
+    }
+    if actual != nil {
+        actualType = reflect.TypeOf(actual).Name()
+    }
     return fmt.Sprintf("'%v%v' expected, but got '%v%v'", 
-            reflect.TypeOf(expected).Name(), expected,
-            reflect.TypeOf(actual).Name(), actual)
+            expectedType, expected,
+            actualType, actual)
 }
+
+type Any struct {
+}
+func (a Any) Equals(other interface{}) (bool,string) {
+    return true, ""
+}
+var __ = Any{}
 
 // A deep equals function. Uses either the Equals method on your type, or the reflect.DeepEqual() function.
 func Equals(expectedI interface{}) Matcher {
@@ -118,5 +132,37 @@ func (m Matcher) And(other Matcher) Matcher {
             return passed, msg1
         }
         return other(actual)
+    }
+}
+
+func HasExactly(items ...interface{}) Matcher {
+    return func(actual interface{}) (bool,string) {
+        if reflect.TypeOf(actual).Kind() == reflect.Slice {
+            valueOfActual := reflect.ValueOf(actual)
+            lenOfActual := valueOfActual.Len()
+            lenOfItems := len(items)
+            hasSameLen := (lenOfItems == lenOfActual)
+            if !hasSameLen {
+                return false, ""
+            }
+            for i := 0; i < lenOfActual; i++ {
+                switch t := items[i].(type) {
+                case Matcher:
+                    if result, msg := t(valueOfActual.Index(i)); !result {
+                        return result, msg
+                    }
+                case Equalable:
+                    if result, msg := t.Equals(valueOfActual.Index(i)); !result {
+                        return result, msg
+                    }
+                default:
+                    if items[i] != valueOfActual.Index(i) {
+                        return false, ""
+                    }
+                }
+            }
+            return true, ""
+        }
+        return false, fmt.Sprintf("HasExactly() matcher requires a collection, found %T", actual)
     }
 }

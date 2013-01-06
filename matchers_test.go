@@ -171,3 +171,58 @@ func TestContainsMatchesIntegersInAList(t *testing.T) {
 func TestAndMatchesBothPredicates(t *testing.T) {
     AssertThat(t, "", IsEmpty.And(Equals("")))
 }
+
+func TestEqualsHandlesNilExpectations(t *testing.T) {
+    result, _ := Equals(nil)("")
+    AssertThat(t, result, IsFalse)
+}
+
+func TestEqualsHandlesNilActuals(t *testing.T) {
+    result, _ := Equals("")(nil)
+    AssertThat(t, result, IsFalse)
+}
+
+func TestNilEqualsNil(t *testing.T) {
+    result, _ := Equals(nil)(nil)
+    AssertThat(t, result, IsTrue)
+}
+
+func TestEmptyHasExactlyListMatchesEmptySplice(t *testing.T) {
+    AssertThat(t, []interface{}{}, HasExactly())
+}
+
+func TestHasExactlyTrueDoesNotMatchEmptySlice(t *testing.T) {
+    AssertThat(t, []interface{}{}, Not(HasExactly(true)))
+}
+
+func TestHasExactlyDoesNotMatchScalarValues(t *testing.T) {
+    AssertThat(t, 1, Not(HasExactly(1)))
+}
+
+func TestHasExactlyMatchesEachElementInTurn(t *testing.T) {
+    AssertThat(t, []interface{}{true}, Not(HasExactly(false)))
+}
+
+func TestAnyMatchesAnything(t *testing.T) {
+    AssertThat(t, true, Equals(__))
+    AssertThat(t, false, Equals(__))
+    AssertThat(t, 1, Equals(__))
+    AssertThat(t, 0, Equals(__))
+    AssertThat(t, []interface{}{}, Equals(__))
+}
+
+func TestAnyCanBeUsedInHasExactly(t *testing.T) {
+    AssertThat(t, []interface{}{true}, HasExactly(__))
+}
+
+func TestAnyCannotBeProductivelyUsedAsActual(t *testing.T) {
+    AssertThat(t, []interface{}{__}, Not(HasExactly(true)))
+}
+
+var testMatcher Matcher = func(actual interface{}) (bool,string) {
+    return true, ""
+}
+
+func TestMatchersCanBeUsedInHasExactly(t *testing.T) {
+    AssertThat(t, []interface{}{1}, HasExactly(testMatcher))
+}
