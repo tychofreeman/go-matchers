@@ -95,6 +95,9 @@ func Equals(expectedI interface{}) Matcher {
             }
     }
     return func (actual interface{}) (bool, string) {
+        if reflect.ValueOf(actual).Kind() == reflect.Ptr && expectedI == nil {
+            return reflect.ValueOf(actual).IsNil(), equalsMsg(expectedI, actual)
+        }
         return reflect.DeepEqual(expectedI, actual), equalsMsg(expectedI, actual)
     }
 }

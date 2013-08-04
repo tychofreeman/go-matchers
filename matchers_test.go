@@ -231,3 +231,8 @@ func TestCanPassVariadicFunctions(t *testing.T) {
     var f = func() (string,bool) { return "", false }
     AssertThat(t, Rtns(f()), HasExactly("", false))
 }
+
+func TestBlah(t *testing.T) {
+    var f *Matcher
+    AssertThat(t, f, Equals(nil))
+}
