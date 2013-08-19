@@ -227,6 +227,10 @@ func TestMatchersCanBeUsedInHasExactly(t *testing.T) {
     AssertThat(t, []interface{}{1}, HasExactly(testMatcher))
 }
 
+func TestArbitrarySlicesCanBeUsedInHasExactly(t *testing.T) {
+    AssertThat(t, []int{1}, HasExactly(1))
+}
+
 func TestCanPassVariadicFunctions(t *testing.T) {
     var f = func() (string,bool) { return "", false }
     AssertThat(t, Rtns(f()), HasExactly("", false))
