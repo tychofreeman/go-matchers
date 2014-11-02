@@ -236,7 +236,16 @@ func TestCanPassVariadicFunctions(t *testing.T) {
     AssertThat(t, Rtns(f()), HasExactly("", false))
 }
 
-func TestBlah(t *testing.T) {
-    var f *Matcher
-    AssertThat(t, f, Equals(nil))
+type TestMock struct {}
+func (tm TestMock) Test(in string) bool {
+    return "a" == in
 }
+/*
+func TestMethod_WasCalledWith_MatchesParams(t *testing.T) {
+    m := TestMock{}
+    m.Test("a")
+    AssertThat(t, m, Method("Test").WasCalledWith(__))
+    AssertThat(t, m, Not(Method("Test").WasCalledWith("b")))
+}
+
+*/

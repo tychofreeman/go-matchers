@@ -149,27 +149,41 @@ func (m Matcher) Or(other Matcher) Matcher {
 
 func HasExactly(items ...interface{}) Matcher {
     return func(actualI interface{}) (bool,string) {
+        if actualI == nil {
+            return false, fmt.Sprintf("Got 'nil' instead of expected %v", items)
+        }
         valueOfActual := reflect.ValueOf(actualI)
-        kind := valueOfActual.Type().Kind() 
-        if kind != reflect.Array && kind != reflect.Slice {
-            return false, fmt.Sprintf("HasExactly() matcher requires a collection, found %T (value %v)", actualI, actualI)
-        }
-        lenOfActual := valueOfActual.Len()
-        lenOfItems := len(items)
-        hasSameLen := (lenOfItems == lenOfActual)
-        if !hasSameLen {
-            return false, fmt.Sprintf("expected collection of size %d, but got size %d", lenOfItems, lenOfActual)
-        }
-        for i := 0; i < lenOfActual; i++ {
-            actual := valueOfActual.Index(i)
-            switch t := items[i].(type) {
-            case Matcher:
-                if result, msg := t(actual); !result {
-                    return result, msg
+        kindOfActual := reflect.TypeOf(actualI).Kind()
+        switch kindOfActual {
+            case reflect.Slice:
+                lenOfActual := valueOfActual.Len()
+                lenOfItems := len(items)
+                hasSameLen := (lenOfItems == lenOfActual)
+                if !hasSameLen {
+                    return false, fmt.Sprintf("expected collection of size %d, but got size %d -- expected [%v] vs actual [%v]", lenOfItems, lenOfActual, items, actualI)
                 }
-            case Equalable:
-                if result, msg := t.Equals(actual); !result {
-                    return result, msg
+                for i := 0; i < lenOfActual; i++ {
+                    switch t := items[i].(type) {
+                    case Matcher:
+                        switch s := actualI.(type) {
+                        case []interface{}:
+                            if result, msg := t(s[i]); !result {
+                                return result, msg
+                            }
+                        default:
+                            if result, msg := t(valueOfActual.Index(i)); !result {
+                                return result, msg
+                            }
+                        }
+                    case Equalable:
+                        if result, msg := t.Equals(valueOfActual.Index(i)); !result {
+                            return result, msg
+                        }
+                    default:
+                        if items[i] != valueOfActual.Index(i).Interface() {
+                            return false, fmt.Sprintf("discrepancy at index %d - %s", i, equalsMsg(items[i], valueOfActual.Index(i)))
+                        }
+                    }
                 }
             default:
                 if items[i] != valueOfActual.Index(i).Interface() {
@@ -177,10 +191,40 @@ func HasExactly(items ...interface{}) Matcher {
                 }
             }
         }
-        return true, ""
+
+        return false, fmt.Sprintf("HasExactly() matcher requires a collection, found %T (%v) (size %v - value %v)", actualI, kindOfActual, valueOfActual.Type().Size(), actualI)
     }
 }
 
 func Rtns(returnValues ...interface{}) []interface{} {
     return returnValues
+}
+
+type MethodMatcherGenerator struct {
+    methodName string
+}
+
+type Call struct {
+    name string
+    args []interface{}
+}
+
+type Mock interface {
+    Calls() []Call
+}
+
+func (mmg MethodMatcherGenerator) WasCalledWith(args ...interface{}) Matcher {
+    return func(actualI interface{}) (bool,string) {
+        switch actualI.(type) {
+            case Mock:
+                return true, ""
+            default:
+                return false, fmt.Sprintf("expected method '%s' was called with args %v", mmg.methodName, args)
+        }
+        panic("switch failed - should have found a valid case in preceeding switch.")
+    }
+}
+
+func Method(name string) MethodMatcherGenerator {
+    return MethodMatcherGenerator{name}
 }
