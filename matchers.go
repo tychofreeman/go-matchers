@@ -186,13 +186,9 @@ func HasExactly(items ...interface{}) Matcher {
                     }
                 }
             default:
-                if items[i] != valueOfActual.Index(i).Interface() {
-                    return false, fmt.Sprintf("discrepancy at index %d - %s", i, equalsMsg(items[i], actual))
-                }
-            }
+                return false, fmt.Sprintf("HasExactly() matcher requires a collection, found %T (%v) (size %v - value %v)", actualI, kindOfActual, valueOfActual.Type().Size(), actualI)
         }
-
-        return false, fmt.Sprintf("HasExactly() matcher requires a collection, found %T (%v) (size %v - value %v)", actualI, kindOfActual, valueOfActual.Type().Size(), actualI)
+        return true, ""
     }
 }
 
