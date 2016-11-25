@@ -154,39 +154,39 @@ func HasExactly(items ...interface{}) Matcher {
         }
         valueOfActual := reflect.ValueOf(actualI)
         kindOfActual := reflect.TypeOf(actualI).Kind()
-        switch kindOfActual {
-            case reflect.Slice:
-                lenOfActual := valueOfActual.Len()
-                lenOfItems := len(items)
-                hasSameLen := (lenOfItems == lenOfActual)
-                if !hasSameLen {
-                    return false, fmt.Sprintf("expected collection of size %d, but got size %d -- expected [%v] vs actual [%v]", lenOfItems, lenOfActual, items, actualI)
-                }
-                for i := 0; i < lenOfActual; i++ {
-                    switch t := items[i].(type) {
-                    case Matcher:
-                        switch s := actualI.(type) {
-                        case []interface{}:
-                            if result, msg := t(s[i]); !result {
-                                return result, msg
-                            }
-                        default:
-                            if result, msg := t(valueOfActual.Index(i)); !result {
-                                return result, msg
-                            }
-                        }
-                    case Equalable:
-                        if result, msg := t.Equals(valueOfActual.Index(i)); !result {
+        _, isSlice := actualI.([]interface{})
+        if isSlice || kindOfActual == reflect.Slice || kindOfActual == reflect.Array {
+            lenOfActual := valueOfActual.Len()
+            lenOfItems := len(items)
+            hasSameLen := (lenOfItems == lenOfActual)
+            if !hasSameLen {
+                return false, fmt.Sprintf("expected collection of size %d, but got size %d -- expected [%v] vs actual [%v]", lenOfItems, lenOfActual, items, actualI)
+            }
+            for i := 0; i < lenOfActual; i++ {
+                switch t := items[i].(type) {
+                case Matcher:
+                    switch s := actualI.(type) {
+                    case []interface{}:
+                        if result, msg := t(s[i]); !result {
                             return result, msg
                         }
                     default:
-                        if items[i] != valueOfActual.Index(i).Interface() {
-                            return false, fmt.Sprintf("discrepancy at index %d - %s", i, equalsMsg(items[i], valueOfActual.Index(i)))
+                        if result, msg := t(valueOfActual.Index(i)); !result {
+                            return result, msg
                         }
                     }
+                case Equalable:
+                    if result, msg := t.Equals(valueOfActual.Index(i)); !result {
+                        return result, msg
+                    }
+                default:
+                    if items[i] != valueOfActual.Index(i).Interface() {
+                        return false, fmt.Sprintf("discrepancy at index %d - %s", i, equalsMsg(items[i], valueOfActual.Index(i)))
+                    }
                 }
-            default:
-                return false, fmt.Sprintf("HasExactly() matcher requires a collection, found %T (%v) (size %v - value %v)", actualI, kindOfActual, valueOfActual.Type().Size(), actualI)
+            }
+        } else {
+            return false, fmt.Sprintf("HasExactly() matcher requires a collection, found %T (size %v - value %v)", actualI, valueOfActual.Type().Size(), actualI)
         }
         return true, ""
     }

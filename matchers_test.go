@@ -227,6 +227,11 @@ func TestMatchersCanBeUsedInHasExactly(t *testing.T) {
     AssertThat(t, []interface{}{1}, HasExactly(testMatcher))
 }
 
+type SomeSlice []interface{}
+func TestTypeAliaseCanBeUsedInHasExatly(t *testing.T) {
+    AssertThat(t, SomeSlice{1}, HasExactly(1))
+}
+
 func TestArbitrarySlicesCanBeUsedInHasExactly(t *testing.T) {
     AssertThat(t, []int{1}, HasExactly(1))
 }
