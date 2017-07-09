@@ -147,15 +147,22 @@ func (m Matcher) Or(other Matcher) Matcher {
     }
 }
 
+// TODO: Rename this - it actually unwraps Value objects, while also returning the desired Value and Kinds
+func actualAndValueAndKind(x interface{}) (interface{}, reflect.Value, reflect.Kind) {
+    asValue, isReflectValue := x.(reflect.Value)
+    if isReflectValue && asValue.CanInterface() {
+        return actualAndValueAndKind(asValue.Interface())
+    }
+    return x, reflect.ValueOf(x), reflect.TypeOf(x).Kind()
+}
+
 func HasExactly(items ...interface{}) Matcher {
     return func(actualI interface{}) (bool,string) {
         if actualI == nil {
             return false, fmt.Sprintf("Got 'nil' instead of expected %v", items)
         }
-        valueOfActual := reflect.ValueOf(actualI)
-        kindOfActual := reflect.TypeOf(actualI).Kind()
-        _, isSlice := actualI.([]interface{})
-        if isSlice || kindOfActual == reflect.Slice || kindOfActual == reflect.Array {
+        actualI, valueOfActual, kindOfActual := actualAndValueAndKind(actualI)
+        if kindOfActual == reflect.Slice || kindOfActual == reflect.Array {
             lenOfActual := valueOfActual.Len()
             lenOfItems := len(items)
             hasSameLen := (lenOfItems == lenOfActual)
