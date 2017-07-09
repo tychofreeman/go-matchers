@@ -245,6 +245,13 @@ type TestMock struct {}
 func (tm TestMock) Test(in string) bool {
     return "a" == in
 }
+
+type List []interface{}
+
+func TestAliasesOfSliceCanBeUsedInExactly(t *testing.T) {
+    AssertThat(t, List{"a", "b", "c"}, HasExactly("a", "b", "c"))
+}
+
 /*
 func TestMethod_WasCalledWith_MatchesParams(t *testing.T) {
     m := TestMock{}
