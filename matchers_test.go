@@ -249,7 +249,7 @@ func (tm TestMock) Test(in string) bool {
 type List []interface{}
 
 func TestAliasesOfSliceCanBeUsedInExactly(t *testing.T) {
-    AssertThat(t, List{"a", List{"b"}, "c"}, HasExactly("a", HasExactly("b"), "c"))
+    AssertThat(t, List{"a", List{"b"}, "c"}, HasExactly("a", HasExactly("b"), Equals("c")))
 }
 
 /*

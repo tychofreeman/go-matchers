@@ -95,8 +95,9 @@ func Equals(expectedI interface{}) Matcher {
             }
     }
     return func (actual interface{}) (bool, string) {
-        if reflect.ValueOf(actual).Kind() == reflect.Ptr && expectedI == nil {
-            return reflect.ValueOf(actual).IsNil(), equalsMsg(expectedI, actual)
+        actual, actualValue, actualKind := actualAndValueAndKind(actual)
+        if actualKind == reflect.Ptr && expectedI == nil {
+            return actualValue.IsNil(), equalsMsg(expectedI, actual)
         }
         return reflect.DeepEqual(expectedI, actual), equalsMsg(expectedI, actual)
     }
@@ -149,6 +150,9 @@ func (m Matcher) Or(other Matcher) Matcher {
 
 // TODO: Rename this - it actually unwraps Value objects, while also returning the desired Value and Kinds
 func actualAndValueAndKind(x interface{}) (interface{}, reflect.Value, reflect.Kind) {
+    if x == nil {
+        return nil, reflect.ValueOf(nil), reflect.Invalid
+    }
     asValue, isReflectValue := x.(reflect.Value)
     if isReflectValue && asValue.CanInterface() {
         return actualAndValueAndKind(asValue.Interface())
