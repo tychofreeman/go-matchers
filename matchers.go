@@ -91,7 +91,7 @@ func Equals(expectedI interface{}) Matcher {
     switch expected := expectedI.(type) {
         case Equalable:
             return func (actual interface{}) (bool, string) {
-                actual, _, _ := actualAndValueAndKind(actual)
+                actual, _, _ = actualAndValueAndKind(actual)
                 return expected.Equals(actual)
             }
     }
