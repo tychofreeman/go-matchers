@@ -23,11 +23,20 @@ type IsEmptyable interface {
 	IsEmpty() bool
 }
 
+// helper is what testing.T has to mark a function as a test helper, so
+// that a failure is reported at the line that called it.
+type helper interface {
+	Helper()
+}
+
 // The base of this package. Other Assert* functions could be added
 // in the future, likely wrappers for this one.
-func AssertThat(t Errorable, expected interface{}, m Matcher) {
-	if ok, msg := m(expected); !ok {
-		t.Errorf(msg)
+func AssertThat(t Errorable, actual interface{}, m Matcher) {
+	if h, isHelper := t.(helper); isHelper {
+		h.Helper()
+	}
+	if ok, msg := m(actual); !ok {
+		t.Errorf("%s", msg)
 	}
 }
 
@@ -66,16 +75,20 @@ func HasMessage(expected string, m Matcher) Matcher {
 }
 
 func equalsMsg(expected, actual interface{}) string {
-	var expectedType, actualType string
-	if expected != nil {
-		expectedType = reflect.TypeOf(expected).Name()
+	expected, _, _ = actualAndValueAndKind(expected)
+	actual, _, _ = actualAndValueAndKind(actual)
+	return fmt.Sprintf("expected %s, but got %s", describe(expected), describe(actual))
+}
+
+// describe is v with its type, as a message shows it: int64 42, string "a".
+func describe(v interface{}) string {
+	if v == nil {
+		return "nil"
 	}
-	if actual != nil {
-		actualType = reflect.TypeOf(actual).Name()
+	if s, isString := v.(string); isString {
+		return fmt.Sprintf("%T %q", v, s)
 	}
-	return fmt.Sprintf("'%v%v' expected, but got '%v%v'",
-		expectedType, expected,
-		actualType, actual)
+	return fmt.Sprintf("%T %v", v, v)
 }
 
 type Any struct {
@@ -106,25 +119,44 @@ func Equals(expectedI interface{}) Matcher {
 	}
 }
 
-// Matcher for testing emptiness of containers. Supports IsEmptyable{}, arrays, slices, and maps.
+// Matcher for testing emptiness of containers. Supports IsEmptyable{}, nil, arrays, channels, maps,
+// slices and strings; anything else fails.
 var IsEmpty Matcher = func(actualI interface{}) (bool, string) {
 	switch actual := actualI.(type) {
+	case nil:
+		return true, ""
 	case IsEmptyable:
 		return actual.IsEmpty(), fmt.Sprintf("expected empty, found %v", actual)
 	}
 	v := reflect.ValueOf(actualI)
-	l := v.Len()
-	return l == 0, fmt.Sprintf("expected empty, but had %d items", l)
+	switch v.Kind() {
+	case reflect.Array, reflect.Chan, reflect.Map, reflect.Slice, reflect.String:
+		l := v.Len()
+		return l == 0, fmt.Sprintf("expected empty, but had %d items", l)
+	}
+	return false, "expected a collection, but got " + describe(actualI)
 }
 
 // Returns Matcher for testing presence of an item within a container
-// Supports arrays, slices, and maps
+// Supports arrays, slices, and maps (their values); anything else fails
 func Contains(expected interface{}) Matcher {
 	return func(actualI interface{}) (bool, string) {
 		v := reflect.ValueOf(actualI)
-		l := v.Len()
-		for i := 0; i < l; i++ {
-			if eq, _ := Equals(expected)(v.Index(i).Interface()); eq == true {
+		var items []reflect.Value
+		switch v.Kind() {
+		case reflect.Array, reflect.Slice:
+			for i := 0; i < v.Len(); i++ {
+				items = append(items, v.Index(i))
+			}
+		case reflect.Map:
+			for values := v.MapRange(); values.Next(); {
+				items = append(items, values.Value())
+			}
+		default:
+			return false, "expected an array, slice or map, but got " + describe(actualI)
+		}
+		for _, item := range items {
+			if eq, _ := Equals(expected)(item.Interface()); eq {
 				return true, ""
 			}
 		}
@@ -231,7 +263,6 @@ func (mmg MethodMatcherGenerator) WasCalledWith(args ...interface{}) Matcher {
 		default:
 			return false, fmt.Sprintf("expected method '%s' was called with args %v", mmg.methodName, args)
 		}
-		panic("switch failed - should have found a valid case in preceeding switch.")
 	}
 }
 

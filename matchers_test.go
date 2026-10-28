@@ -1,6 +1,7 @@
 package matchers
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -10,7 +11,7 @@ type MockT struct {
 }
 
 func (mock *MockT) Errorf(format string, args ...interface{}) {
-	mock.errArgs = append(mock.errArgs, format)
+	mock.errArgs = append(mock.errArgs, fmt.Sprintf(format, args...))
 }
 
 // Document that we don't care about this parameter.
@@ -145,15 +146,8 @@ func TestIsEmptyIsUsedWhenFound(t *testing.T) {
 	AssertThat(t, notEmpty, Not(IsEmpty))
 }
 
-func TestIsEmptyPanicsForArbitreryTypes(t *testing.T) {
-	defer func() {
-		e := recover()
-		if e == nil {
-			t.Errorf("Expected to panic when given non-emptable type.")
-		}
-	}()
-
-	AssertThat(t, 0, IsEmpty)
+func TestIsEmptyFailsForArbitraryTypes(t *testing.T) {
+	AssertThat(t, 0, Not(IsEmpty))
 }
 
 func TestContainsDoesntMatchEmptyIntegerSlice(t *testing.T) {
@@ -263,3 +257,58 @@ func TestMethod_WasCalledWith_MatchesParams(t *testing.T) {
 }
 
 */
+
+// recorder is an Errorable that keeps the messages it is given, and
+// whether it was marked as a test helper.
+type recorder struct {
+	messages []string
+	helped   bool
+}
+
+func (r *recorder) Errorf(format string, args ...interface{}) {
+	r.messages = append(r.messages, fmt.Sprintf(format, args...))
+}
+
+func (r *recorder) Helper() { r.helped = true }
+
+// AssertThat marks itself a helper, so that go test reports a failure at
+// the line of the test that called it.
+func TestAssertThatIsATestHelper(t *testing.T) {
+	r := &recorder{}
+	AssertThat(r, 1, Equals(2))
+	AssertThat(t, r.helped, IsTrue)
+}
+
+func TestAssertThatReportsMessagesAsTheyAre(t *testing.T) {
+	r := &recorder{}
+	AssertThat(r, "50% off", Equals("60% off"))
+	AssertThat(t, r.messages, HasExactly(`expected string "60% off", but got string "50% off"`))
+}
+
+func TestEqualsNamesTheTypeAndTheValue(t *testing.T) {
+	AssertThat(t, int64(42), HasMessage("expected int64 43, but got int64 42", Equals(int64(43))))
+	AssertThat(t, 1, HasMessage("expected int64 1, but got int 1", Equals(int64(1))))
+	AssertThat(t, nil, HasMessage("expected int 1, but got nil", Equals(1)))
+}
+
+func TestHasExactlyNamesTheTypeAndTheValue(t *testing.T) {
+	AssertThat(t, []int{1, 2}, HasMessage("discrepancy at index 1 - expected int 3, but got int 2", HasExactly(1, 3)))
+}
+
+func TestIsEmptyFailsForWhatIsntACollection(t *testing.T) {
+	AssertThat(t, 5, Not(IsEmpty))
+	AssertThat(t, 5, HasMessage("expected a collection, but got int 5", IsEmpty))
+	AssertThat(t, nil, IsEmpty)
+	AssertThat(t, "", IsEmpty)
+}
+
+func TestContainsFailsForWhatIsntACollection(t *testing.T) {
+	AssertThat(t, 5, Not(Contains(5)))
+	AssertThat(t, 5, HasMessage("expected an array, slice or map, but got int 5", Contains(5)))
+	AssertThat(t, nil, Not(Contains(5)))
+}
+
+func TestContainsLooksAtAMapsValues(t *testing.T) {
+	AssertThat(t, map[string]int{"a": 1}, Contains(1))
+	AssertThat(t, map[string]int{"a": 1}, Not(Contains("a")))
+}
