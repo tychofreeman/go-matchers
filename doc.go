@@ -20,11 +20,10 @@ This package is used to change this:
 into the more readable:
 
 	import "my_boolean_pkg"
-	import "fmt"
 	import "testing"
 	import . "github.com/tychofreeman/go-matchers"
 	func TestTrueIsTrue(t *testing.T) {
-	   AssertTrue(t, my_boolean_pkg.True, IsTrue)
+	   AssertThat(t, my_boolean_pkg.True, IsTrue)
 	}
 
 The latter will output a (usually) highly readable message, which is consistent across your project. (I find creating error messages to be a bit of a pain.)
@@ -40,15 +39,15 @@ If you wish to have your own text, you may create a Matcher specific to your nee
 	        case reflect.Int16: fallthrough
 	        case reflect.Int32: fallthrough
 	        case reflect.Int64:
-	            return (actualValue.Int() % 2 == 0), fmt.Sprintf("expecting an odd integer, but got %v (signed)", actualValue.Int())
+	            return (actualValue.Int() % 2 != 0), fmt.Sprintf("expecting an odd integer, but got %v (signed)", actualValue.Int())
 	        case reflect.Uint:   fallthrough
 	        case reflect.Uint8:  fallthrough
 	        case reflect.Uint16: fallthrough
 	        case reflect.Uint32: fallthrough
 	        case reflect.Uint64:
-	            return (actualValue.Uint() % 2 == 0), fmt.Sprintf("expecting an odd integer, but got %v (unsigned)", actualValue.Uint())
+	            return (actualValue.Uint() % 2 != 0), fmt.Sprintf("expecting an odd integer, but got %v (unsigned)", actualValue.Uint())
 	    }
-	    return false, fmt.Sprintf("expecting an odd integer, but got non-boolean of type %s", reflect.TypeOf(actual).Name())
+	    return false, fmt.Sprintf("expecting an odd integer, but got %T", actual)
 	}
 
 It is common for a Matcher to be implemented as a closure around an expected value, like:
@@ -63,13 +62,12 @@ It is common for a Matcher to be implemented as a closure around an expected val
 	   }
 	}
 
-It can be useful to combine Matchers. For example, there is a Not() method which takes a Matcher in and returns a modified Matcher. It is used to invert the meaning of your Matcher, and the output attempts to reflect that by prepending the word 'not ' to the error message.
+It can be useful to combine Matchers. Not() inverts the meaning of a Matcher, and the output attempts to reflect that by prepending the word 'not ' to the error message. m.And(other) and m.Or(other) match when both, or either, match.
 
 Future Extensions:
 
   - It would be nice to be able to enhance the current error messages with test-specific text, such as this GTest snippet:
     ASSERT_EQ(true, false) << "This should never pass!"
-  - Other Matcher-modifying methods would be usefule: And, Or, Unless, etc.
 
 Hopefully, you find your tests easier to write and think about by using this package.
 */
