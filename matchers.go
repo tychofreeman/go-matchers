@@ -44,6 +44,9 @@ func AssertThat(t Errorable, actual interface{}, m Matcher) {
 func Not(m Matcher) Matcher {
 	return func(actual interface{}) (bool, string) {
 		ok, msg := m(actual)
+		if ok && msg == "" {
+			return false, "expected no match, but " + describe(actual) + " matched"
+		}
 		return !ok, "not " + msg
 	}
 }
@@ -53,7 +56,7 @@ func isBool(expected bool, actual interface{}) (bool, string) {
 	case bool:
 		return a == expected, fmt.Sprintf("'%v' was expected, but got %v", expected, a)
 	}
-	return false, fmt.Sprintf("'%v' was expected, but got non-boolean of type %s", expected, reflect.TypeOf(actual).Name())
+	return false, fmt.Sprintf("'%v' was expected, but got %s", expected, describe(actual))
 }
 
 // Basic truthiness
@@ -91,6 +94,8 @@ func describe(v interface{}) string {
 	return fmt.Sprintf("%T %v", v, v)
 }
 
+// Any Equals every value. Use Anything for an element whose value a test
+// does not care about.
 type Any struct {
 }
 
@@ -112,7 +117,7 @@ func Equals(expectedI interface{}) Matcher {
 	}
 	return func(actual interface{}) (bool, string) {
 		actual, actualValue, actualKind := actualAndValueAndKind(actual)
-		if actualKind == reflect.Ptr && expectedI == nil {
+		if expectedI == nil && canBeNil(actualKind) {
 			return actualValue.IsNil(), equalsMsg(expectedI, actual)
 		}
 		return reflect.DeepEqual(expectedI, actual), equalsMsg(expectedI, actual)
@@ -156,7 +161,7 @@ func Contains(expected interface{}) Matcher {
 			return false, "expected an array, slice or map, but got " + describe(actualI)
 		}
 		for _, item := range items {
-			if eq, _ := Equals(expected)(item.Interface()); eq {
+			if eq, _ := matcherFor(expected)(item.Interface()); eq {
 				return true, ""
 			}
 		}
@@ -176,10 +181,12 @@ func (m Matcher) And(other Matcher) Matcher {
 
 func (m Matcher) Or(other Matcher) Matcher {
 	return func(actual interface{}) (bool, string) {
-		if passed, msg1 := m(actual); passed {
+		passed, msg1 := m(actual)
+		if passed {
 			return passed, msg1
 		}
-		return other(actual)
+		passed, msg2 := other(actual)
+		return passed, msg1 + "; or " + msg2
 	}
 }
 
@@ -195,44 +202,21 @@ func actualAndValueAndKind(x interface{}) (interface{}, reflect.Value, reflect.K
 	return x, reflect.ValueOf(x), reflect.TypeOf(x).Kind()
 }
 
+// HasExactly matches a slice or array with one element for each item, in
+// order. An item is a Matcher for its element, or a value its element Equals.
 func HasExactly(items ...interface{}) Matcher {
 	return func(actualI interface{}) (bool, string) {
-		if actualI == nil {
-			return false, fmt.Sprintf("Got 'nil' instead of expected %v", items)
-		}
 		actualI, valueOfActual, kindOfActual := actualAndValueAndKind(actualI)
-		if kindOfActual == reflect.Slice || kindOfActual == reflect.Array {
-			lenOfActual := valueOfActual.Len()
-			lenOfItems := len(items)
-			hasSameLen := (lenOfItems == lenOfActual)
-			if !hasSameLen {
-				return false, fmt.Sprintf("expected collection of size %d, but got size %d -- expected [%v] vs actual [%v]", lenOfItems, lenOfActual, items, actualI)
+		if kindOfActual != reflect.Slice && kindOfActual != reflect.Array {
+			return false, "expected a slice or array, but got " + describe(actualI)
+		}
+		if valueOfActual.Len() != len(items) {
+			return false, fmt.Sprintf("expected collection of size %d, but got size %d -- expected %v vs actual %v", len(items), valueOfActual.Len(), items, actualI)
+		}
+		for i, item := range items {
+			if ok, msg := matcherFor(item)(valueOfActual.Index(i).Interface()); !ok {
+				return false, fmt.Sprintf("discrepancy at index %d - %s", i, msg)
 			}
-			for i := 0; i < lenOfActual; i++ {
-				switch t := items[i].(type) {
-				case Matcher:
-					switch s := actualI.(type) {
-					case []interface{}:
-						if result, msg := t(s[i]); !result {
-							return result, msg
-						}
-					default:
-						if result, msg := t(valueOfActual.Index(i)); !result {
-							return result, msg
-						}
-					}
-				case Equalable:
-					if result, msg := t.Equals(valueOfActual.Index(i)); !result {
-						return result, msg
-					}
-				default:
-					if items[i] != valueOfActual.Index(i).Interface() {
-						return false, fmt.Sprintf("discrepancy at index %d - %s", i, equalsMsg(items[i], valueOfActual.Index(i)))
-					}
-				}
-			}
-		} else {
-			return false, fmt.Sprintf("HasExactly() matcher requires a collection, found %T (size %v - value %v)", actualI, valueOfActual.Type().Size(), actualI)
 		}
 		return true, ""
 	}
@@ -242,30 +226,71 @@ func Rtns(returnValues ...interface{}) []interface{} {
 	return returnValues
 }
 
-type MethodMatcherGenerator struct {
-	methodName string
-}
-
-type Call struct {
-	name string
-	args []interface{}
-}
-
-type Mock interface {
-	Calls() []Call
-}
-
-func (mmg MethodMatcherGenerator) WasCalledWith(args ...interface{}) Matcher {
-	return func(actualI interface{}) (bool, string) {
-		switch actualI.(type) {
-		case Mock:
-			return true, ""
-		default:
-			return false, fmt.Sprintf("expected method '%s' was called with args %v", mmg.methodName, args)
-		}
+// canBeNil says whether a value of kind k can be nil.
+func canBeNil(k reflect.Kind) bool {
+	switch k {
+	case reflect.Chan, reflect.Func, reflect.Map, reflect.Ptr, reflect.Slice, reflect.UnsafePointer:
+		return true
 	}
+	return false
 }
 
-func Method(name string) MethodMatcherGenerator {
-	return MethodMatcherGenerator{name}
+// matcherFor is item if it is a Matcher, and otherwise Equals(item).
+func matcherFor(item interface{}) Matcher {
+	if m, isMatcher := item.(Matcher); isMatcher {
+		return m
+	}
+	return Equals(item)
+}
+
+// Anything matches any value, as an item of HasExactly or with Equals.
+var Anything = Any{}
+
+// Ordered is the types whose values the comparison matchers can order.
+type Ordered interface {
+	~int | ~int8 | ~int16 | ~int32 | ~int64 |
+		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr |
+		~float32 | ~float64 | ~string
+}
+
+// GreaterThan matches a value greater than expected.
+func GreaterThan[T Ordered](expected T) Matcher {
+	return compare("greater than "+describe(expected), func(a T) bool { return a > expected })
+}
+
+// LessThan matches a value less than expected.
+func LessThan[T Ordered](expected T) Matcher {
+	return compare("less than "+describe(expected), func(a T) bool { return a < expected })
+}
+
+// AtLeast matches a value greater than or equal to expected.
+func AtLeast[T Ordered](expected T) Matcher {
+	return compare("at least "+describe(expected), func(a T) bool { return a >= expected })
+}
+
+// AtMost matches a value less than or equal to expected.
+func AtMost[T Ordered](expected T) Matcher {
+	return compare("at most "+describe(expected), func(a T) bool { return a <= expected })
+}
+
+// Between matches a value from low to high, both included.
+func Between[T Ordered](low, high T) Matcher {
+	want := "between " + describe(low) + " and " + describe(high)
+	return compare(want, func(a T) bool { return low <= a && a <= high })
+}
+
+// CloseTo matches a floating-point value within delta of expected.
+func CloseTo[T ~float32 | ~float64](expected, delta T) Matcher {
+	want := "within " + describe(delta) + " of " + describe(expected)
+	return compare(want, func(a T) bool { return expected-delta <= a && a <= expected+delta })
+}
+
+// compare matches a T for which ok holds; want says what was expected. A
+// value of another type fails, as it does for Equals.
+func compare[T Ordered](want string, ok func(T) bool) Matcher {
+	return func(actualI interface{}) (bool, string) {
+		actualI, _, _ = actualAndValueAndKind(actualI)
+		actual, isT := actualI.(T)
+		return isT && ok(actual), "expected " + want + ", but got " + describe(actualI)
+	}
 }

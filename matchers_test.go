@@ -236,27 +236,11 @@ func TestCanPassVariadicFunctions(t *testing.T) {
 	AssertThat(t, Rtns(f()), HasExactly("", false))
 }
 
-type TestMock struct{}
-
-func (tm TestMock) Test(in string) bool {
-	return "a" == in
-}
-
 type List []interface{}
 
 func TestAliasesOfSliceCanBeUsedInExactly(t *testing.T) {
 	AssertThat(t, List{"a", List{"b"}, "c"}, HasExactly("a", HasExactly("b"), Equals("c")))
 }
-
-/*
-func TestMethod_WasCalledWith_MatchesParams(t *testing.T) {
-    m := TestMock{}
-    m.Test("a")
-    AssertThat(t, m, Method("Test").WasCalledWith(__))
-    AssertThat(t, m, Not(Method("Test").WasCalledWith("b")))
-}
-
-*/
 
 // recorder is an Errorable that keeps the messages it is given, and
 // whether it was marked as a test helper.
@@ -311,4 +295,100 @@ func TestContainsFailsForWhatIsntACollection(t *testing.T) {
 func TestContainsLooksAtAMapsValues(t *testing.T) {
 	AssertThat(t, map[string]int{"a": 1}, Contains(1))
 	AssertThat(t, map[string]int{"a": 1}, Not(Contains("a")))
+}
+
+func TestIsTrueFailsForNil(t *testing.T) {
+	AssertThat(t, nil, HasMessage("'true' was expected, but got nil", IsTrue))
+	AssertThat(t, nil, Not(IsFalse))
+}
+
+func TestHasExactlyComparesSlicesDeeply(t *testing.T) {
+	AssertThat(t, [][]int{{1}}, HasExactly([]int{1}))
+	AssertThat(t, [][]int{{1}}, Not(HasExactly([]int{2})))
+}
+
+func TestHasExactlyGivesMatchersTheElements(t *testing.T) {
+	AssertThat(t, []bool{true}, HasExactly(IsTrue))
+	AssertThat(t, SomeSlice{true}, HasExactly(IsTrue))
+}
+
+// typeOf is an Equalable that matches a value of the type it names.
+type typeOf string
+
+func (want typeOf) Equals(actual interface{}) (bool, string) {
+	got := fmt.Sprintf("%T", actual)
+	return got == string(want), "expected a " + string(want) + ", but got a " + got
+}
+
+func TestHasExactlyGivesEqualablesTheElements(t *testing.T) {
+	AssertThat(t, []int{1}, HasExactly(typeOf("int")))
+}
+
+func TestHasExactlyNamesWhatIsntACollection(t *testing.T) {
+	AssertThat(t, 1, HasMessage("expected a slice or array, but got int 1", HasExactly(1)))
+}
+
+func TestNotSaysWhatMatched(t *testing.T) {
+	AssertThat(t, []int{5}, HasMessage("expected no match, but []int [5] matched", Not(Contains(5))))
+}
+
+func TestOrGivesBothMessages(t *testing.T) {
+	AssertThat(t, 3, HasMessage("expected int 1, but got int 3; or expected int 2, but got int 3", Equals(1).Or(Equals(2))))
+}
+
+func TestEqualsNilMatchesEveryNil(t *testing.T) {
+	var s []int
+	var m map[string]int
+	var c chan int
+	var f func()
+	AssertThat(t, s, Equals(nil))
+	AssertThat(t, m, Equals(nil))
+	AssertThat(t, c, Equals(nil))
+	AssertThat(t, f, Equals(nil))
+	AssertThat(t, []int{}, Not(Equals(nil)))
+}
+
+func TestContainsTakesMatchers(t *testing.T) {
+	AssertThat(t, []bool{false, true}, Contains(IsTrue))
+	AssertThat(t, []bool{false}, Not(Contains(IsTrue)))
+}
+
+func TestAnythingMatchesAnyElement(t *testing.T) {
+	AssertThat(t, []int{1, 2}, HasExactly(Anything, 2))
+	AssertThat(t, []int{1, 2}, Not(HasExactly(Anything, 3)))
+}
+
+func TestGreaterThanAndLessThan(t *testing.T) {
+	AssertThat(t, 6, GreaterThan(5))
+	AssertThat(t, 5, Not(GreaterThan(5)))
+	AssertThat(t, 4, LessThan(5))
+	AssertThat(t, 5, Not(LessThan(5)))
+	AssertThat(t, "b", GreaterThan("a"))
+	AssertThat(t, 3, HasMessage("expected greater than int 5, but got int 3", GreaterThan(5)))
+}
+
+func TestAtLeastAndAtMostIncludeTheirBound(t *testing.T) {
+	AssertThat(t, 5, AtLeast(5))
+	AssertThat(t, 4, Not(AtLeast(5)))
+	AssertThat(t, 5, AtMost(5))
+	AssertThat(t, 6, Not(AtMost(5)))
+}
+
+func TestBetweenIncludesBothBounds(t *testing.T) {
+	AssertThat(t, 1, Between(1, 3))
+	AssertThat(t, 3, Between(1, 3))
+	AssertThat(t, 4, Not(Between(1, 3)))
+	AssertThat(t, 4, HasMessage("expected between int 1 and int 3, but got int 4", Between(1, 3)))
+}
+
+func TestCloseToAllowsTheDelta(t *testing.T) {
+	AssertThat(t, 0.1+0.2, CloseTo(0.3, 1e-9))
+	AssertThat(t, 1.5, Not(CloseTo(1.0, 0.1)))
+	AssertThat(t, float32(1.05), CloseTo(float32(1), 0.1))
+	AssertThat(t, 1.5, HasMessage("expected within float64 0.1 of float64 1, but got float64 1.5", CloseTo(1.0, 0.1)))
+}
+
+func TestComparisonsNameAnotherType(t *testing.T) {
+	AssertThat(t, int64(6), HasMessage("expected greater than int 5, but got int64 6", GreaterThan(5)))
+	AssertThat(t, nil, Not(LessThan(5)))
 }

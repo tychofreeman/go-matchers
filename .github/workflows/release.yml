@@ -1,0 +1,64 @@
+name: Release
+
+# Every push to master whose Test run passes is released: this tags the
+# commit with the next version after the latest tag and creates its GitHub
+# release, with notes made from the merged pull requests. The pull request
+# a push merged chooses the step: a "major" or "minor" label bumps that
+# part, anything else the patch. Pushes of Markdown alone run no Test, so
+# they are not released. Run it by hand (workflow_dispatch) to release the
+# head of master the same way.
+on:
+  workflow_run:
+    workflows: [Test]
+    types: [completed]
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
+          fetch-depth: 0
+
+      - name: Tag and release the next version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -n "$(git tag --points-at "$SHA" --list 'v*')" ]; then
+            echo "$SHA is already tagged; nothing to release"
+            exit 0
+          fi
+          last=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1)
+          if [ -n "$last" ] && ! git merge-base --is-ancestor "$last" "$SHA"; then
+            echo "$SHA is not after $last (a later push was released first); nothing to release"
+            exit 0
+          fi
+          labels=$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/pulls" --jq '[.[].labels[].name] | join(" ")')
+          IFS=. read -r major minor patch <<< "${last:-v0.0.0}"
+          major=${major#v}
+          case " $labels " in
+            *" major "*) tag="v$((major + 1)).0.0" ;;
+            *" minor "*) tag="v$major.$((minor + 1)).0" ;;
+            *) tag="v$major.$minor.$((patch + 1))" ;;
+          esac
+          echo "releasing $tag after ${last:-no tag} (labels: ${labels:-none})"
+          if [ -n "$last" ]; then
+            gh release create "$tag" --target "$SHA" --title "$tag" \
+              --generate-notes --notes-start-tag "$last"
+          else
+            gh release create "$tag" --target "$SHA" --title "$tag" --generate-notes
+          fi
